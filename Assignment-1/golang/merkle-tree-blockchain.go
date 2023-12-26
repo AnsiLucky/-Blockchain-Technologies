@@ -23,7 +23,6 @@ type Transaction struct {
 	Amount             float64
 }
 
-// Hash the content of block's
 func (b *Block) HashBlock() []byte {
 	var transactionStr string
 	for _, tx := range b.Transactions {
@@ -32,41 +31,6 @@ func (b *Block) HashBlock() []byte {
 	blockStr := fmt.Sprintf("%s%x%d%d", transactionStr, b.PreviousBlockHash, b.Timestamp.UnixNano(), b.Nonce)
 	hash := sha256.Sum256([]byte(blockStr))
 	return hash[:]
-}
-
-// Compute the Merkle root hash via transaction
-func (b *Block) MerkleRootHash() []byte {
-	var hashes [][]byte
-	for _, tx := range b.Transactions {
-		hash := sha256.Sum256([]byte(fmt.Sprintf("%x%x%f", tx.SenderPublicKey, tx.RecipientPublicKey, tx.Amount)))
-		hashes = append(hashes, hash[:])
-	}
-	root := constructMerkleTree(hashes)
-	return root
-}
-
-// constructMerkleTree builds a Merkle tree from a slice of hashes
-func constructMerkleTree(hashes [][]byte) []byte {
-	if len(hashes) == 0 {
-		return nil
-	}
-	if len(hashes) == 1 {
-		return hashes[0]
-	}
-
-	var newHashes [][]byte
-	for i := 0; i < len(hashes); i += 2 {
-		hash1 := hashes[i]
-		var hash2 []byte
-		if i+1 < len(hashes) {
-			hash2 = hashes[i+1]
-		}
-		combined := append(hash1, hash2...)
-		hash := sha256.Sum256(combined)
-		newHashes = append(newHashes, hash[:])
-	}
-
-	return constructMerkleTree(newHashes)
 }
 
 func GenerateKeyPair() (*rsa.PrivateKey, *rsa.PublicKey) {
@@ -119,37 +83,70 @@ func AddTransactionToBlock(block *Block, senderPrivateKey *rsa.PrivateKey, recip
 	}
 
 	block.Transactions = append(block.Transactions, transaction)
+	block.MerkleRoot = block.ComputeMerkleRoot()
 }
 
 func DisplayBlockchain(blockchain []Block) {
 	for i, block := range blockchain {
-		fmt.Printf("Block %d: %x\n", i+1, block.HashBlock())
+		fmt.Printf("Block %d: Merkle Root: %x, Hash: %x\n", i+1, block.MerkleRoot, block.HashBlock())
 	}
 }
 
+func (b *Block) ComputeMerkleRoot() []byte {
+	var hashes [][]byte
+	for _, tx := range b.Transactions {
+		hash := sha256.Sum256([]byte(fmt.Sprintf("%x%x%f", tx.SenderPublicKey, tx.RecipientPublicKey, tx.Amount)))
+		hashes = append(hashes, hash[:])
+	}
+	return constructMerkleTree(hashes)
+}
+
+func constructMerkleTree(hashes [][]byte) []byte {
+	if len(hashes) == 0 {
+		return nil
+	}
+	if len(hashes) == 1 {
+		return hashes[0]
+	}
+
+	var newHashes [][]byte
+	for i := 0; i < len(hashes); i += 2 {
+		hash1 := hashes[i]
+		var hash2 []byte
+		if i+1 < len(hashes) {
+			hash2 = hashes[i+1]
+		}
+		combined := append(hash1, hash2...)
+		hash := sha256.Sum256(combined)
+		newHashes = append(newHashes, hash[:])
+	}
+
+	return constructMerkleTree(newHashes)
+}
+
 func main() {
-	fmt.Println("Blockchain Implementation Application")
+	fmt.Println("Blockchain powered by Merkle Tree!")
 
 	senderPrivateKey, senderPublicKey := GenerateKeyPair()
 	blockchain := []Block{CreateGenesisBlock()}
 
 	for {
-		fmt.Println("\n1. Create and Add Transaction")
+		fmt.Println("\n1. Add Transaction to Blockchain")
 		fmt.Println("2. View Blockchain")
 		fmt.Println("3. Exit")
 
 		var choice string
-		fmt.Print("Input num: ")
+		fmt.Print("Choice variant: ")
 		fmt.Scanln(&choice)
 
 		switch choice {
 		case "1":
 			var recipientPublicKey string
-			fmt.Print("Recipient's Public Key: ")
+			fmt.Print("Recipient's public key: ")
 			fmt.Scanln(&recipientPublicKey)
 
 			var amount float64
-			fmt.Print("Amount of Transaction: ")
+			fmt.Print("Transaction amount: ")
 			fmt.Scanln(&amount)
 
 			newBlock := Block{
@@ -160,7 +157,7 @@ func main() {
 			}
 			AddTransactionToBlock(&newBlock, senderPrivateKey, senderPublicKey, amount)
 			blockchain = append(blockchain, newBlock)
-			fmt.Println("Transaction added successfully :)")
+			fmt.Println("Transaction added successfully!")
 
 		case "2":
 			DisplayBlockchain(blockchain)
@@ -170,7 +167,7 @@ func main() {
 			return
 
 		default:
-			fmt.Println("Choice Valid Input")
+			fmt.Println("Choose valid choose.")
 		}
 	}
 }
